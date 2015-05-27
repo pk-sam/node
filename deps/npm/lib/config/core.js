@@ -8,8 +8,9 @@ var fs = require("fs")
 var path = require("path")
 var nopt = require("nopt")
 var ini = require("ini")
-var Octal = configDefs.Octal
+var Umask = configDefs.Umask
 var mkdirp = require("mkdirp")
+var umask = require("../utils/umask")
 
 exports.load = load
 exports.Conf = Conf
@@ -73,8 +74,10 @@ function load () {
   loading = true
 
   cb = once(function (er, conf) {
-    if (!er)
+    if (!er) {
       exports.loaded = conf
+      loading = false
+    }
     loadCbs.forEach(function (fn) {
       fn(er, conf)
     })
@@ -151,10 +154,17 @@ function load_(builtin, rc, cli, cb) {
     // annoying humans and their expectations!
     if (conf.get("prefix")) {
       var etc = path.resolve(conf.get("prefix"), "etc")
-      defaults.globalconfig = path.resolve(etc, "npmrc")
-      defaults.globalignorefile = path.resolve(etc, "npmignore")
+      mkdirp(etc, function (err) {
+        defaults.globalconfig = path.resolve(etc, "npmrc")
+        defaults.globalignorefile = path.resolve(etc, "npmignore")
+        afterUserContinuation()
+      })
+    } else {
+      afterUserContinuation()
     }
+  }
 
+  function afterUserContinuation() {
     conf.addFile(conf.get("globalconfig"), "global")
 
     // move the builtin into the conf stack now.
@@ -219,6 +229,7 @@ Conf.prototype.setUser = require("./set-user.js")
 Conf.prototype.findPrefix = require("./find-prefix.js")
 Conf.prototype.getCredentialsByURI = require("./get-credentials-by-uri.js")
 Conf.prototype.setCredentialsByURI = require("./set-credentials-by-uri.js")
+Conf.prototype.clearCredentialsByURI = require("./clear-credentials-by-uri.js")
 
 Conf.prototype.loadExtras = function(cb) {
   this.setUser(function(er) {
@@ -362,8 +373,8 @@ function parseField (f, k) {
   var isPath = -1 !== typeList.indexOf(path)
   var isBool = -1 !== typeList.indexOf(Boolean)
   var isString = -1 !== typeList.indexOf(String)
-  var isOctal = -1 !== typeList.indexOf(Octal)
-  var isNumber = isOctal || (-1 !== typeList.indexOf(Number))
+  var isUmask = -1 !== typeList.indexOf(Umask)
+  var isNumber = -1 !== typeList.indexOf(Number)
 
   f = (""+f).trim()
 
@@ -396,8 +407,11 @@ function parseField (f, k) {
     f = path.resolve(f)
   }
 
+  if (isUmask)
+    f = umask.fromString(f)
+
   if (isNumber && !isNaN(f))
-    f = isOctal ? parseInt(f, 8) : +f
+    f = +f
 
   return f
 }

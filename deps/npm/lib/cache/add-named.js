@@ -7,7 +7,6 @@ var path = require("path")
   , readJson = require("read-package-json")
   , url = require("url")
   , npm = require("../npm.js")
-  , registry = npm.registry
   , deprCheck = require("../utils/depr-check.js")
   , inflight = require("inflight")
   , addRemoteTarball = require("./add-remote-tarball.js")
@@ -18,7 +17,7 @@ var path = require("path")
 module.exports = addNamed
 
 function getOnceFromRegistry (name, from, next, done) {
-  mapToRegistry(name, npm.config, function (er, uri) {
+  mapToRegistry(name, npm.config, function (er, uri, auth) {
     if (er) return done(er)
 
     var key = "registry:" + uri
@@ -26,7 +25,7 @@ function getOnceFromRegistry (name, from, next, done) {
     if (!next) return log.verbose(from, key, "already in flight; waiting")
     else log.verbose(from, key, "not in flight; fetching")
 
-    registry.get(uri, null, next)
+    npm.registry.get(uri, { auth : auth }, next)
   })
 }
 
@@ -35,20 +34,23 @@ function addNamed (name, version, data, cb_) {
   assert(typeof cb_ === "function", "must have callback")
 
   var key = name + "@" + version
-  log.verbose("addNamed", key)
+  log.silly("addNamed", key)
 
   function cb (er, data) {
     if (data && !data._fromGithub) data._from = key
     cb_(er, data)
   }
 
-  log.silly("addNamed", "semver.valid", semver.valid(version))
-  log.silly("addNamed", "semver.validRange", semver.validRange(version))
-  var fn = ( semver.valid(version, true) ? addNameVersion
-           : semver.validRange(version, true) ? addNameRange
-           : addNameTag
-           )
-  fn(name, version, data, cb)
+  if (semver.valid(version, true)) {
+    log.verbose('addNamed', JSON.stringify(version), 'is a plain semver version for', name)
+    addNameVersion(name, version, data, cb)
+  } else if (semver.validRange(version, true)) {
+    log.verbose('addNamed', JSON.stringify(version), 'is a valid semver range for', name)
+    addNameRange(name, version, data, cb)
+  } else {
+    log.verbose('addNamed', JSON.stringify(version), 'is being treated as a dist-tag for', name)
+    addNameTag(name, version, data, cb)
+  }
 }
 
 function addNameTag (name, tag, data, cb) {
@@ -169,28 +171,28 @@ function addNameVersion (name, v, data, cb) {
     })
 
     function fetchit () {
-      if (!npm.config.get("registry")) {
-        return cb(new Error("Cannot fetch: "+dist.tarball))
-      }
+      mapToRegistry(name, npm.config, function (er, _, auth, ruri) {
+        if (er) return cb(er)
 
-      // Use the same protocol as the registry.  https registry --> https
-      // tarballs, but only if they're the same hostname, or else detached
-      // tarballs may not work.
-      var tb = url.parse(dist.tarball)
-      var rp = url.parse(npm.config.get("registry"))
-      if (tb.hostname === rp.hostname
-          && tb.protocol !== rp.protocol) {
-        tb.protocol = url.parse(npm.config.get("registry")).protocol
-        delete tb.href
-      }
-      tb = url.format(tb)
+        // Use the same protocol as the registry.  https registry --> https
+        // tarballs, but only if they're the same hostname, or else detached
+        // tarballs may not work.
+        var tb = url.parse(dist.tarball)
+        var rp = url.parse(ruri)
+        if (tb.hostname === rp.hostname && tb.protocol !== rp.protocol) {
+          tb.protocol = rp.protocol
+          delete tb.href
+        }
+        tb = url.format(tb)
 
-      // Only add non-shasum'ed packages if --forced. Only ancient things
-      // would lack this for good reasons nowadays.
-      if (!dist.shasum && !npm.config.get("force")) {
-        return cb(new Error("package lacks shasum: " + data._id))
-      }
-      return addRemoteTarball(tb, data, dist.shasum, cb)
+        // Only add non-shasum'ed packages if --forced. Only ancient things
+        // would lack this for good reasons nowadays.
+        if (!dist.shasum && !npm.config.get("force")) {
+          return cb(new Error("package lacks shasum: " + data._id))
+        }
+
+        addRemoteTarball(tb, data, dist.shasum, auth, cb)
+      })
     }
   }
 }

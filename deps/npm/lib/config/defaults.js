@@ -9,6 +9,7 @@ var path = require("path")
   , nopt = require("nopt")
   , os = require("os")
   , osenv = require("osenv")
+  , umask = require("../utils/umask")
 
 var log
 try {
@@ -20,30 +21,15 @@ try {
   } }
 }
 
-exports.Octal = Octal
-function Octal () {}
-function validateOctal (data, k, val) {
-  // must be either an integer or an octal string.
-  if (typeof val === "number") {
-    data[k] = val
-    return true
-  }
-
-  if (typeof val === "string") {
-    if (val.charAt(0) !== "0" || isNaN(val)) return false
-    data[k] = parseInt(val, 8).toString(8)
-  }
+exports.Umask = Umask
+function Umask () {}
+function validateUmask (data, k, val) {
+  return umask.validate(data, k, val)
 }
 
 function validateSemver (data, k, val) {
   if (!semver.valid(val)) return false
   data[k] = semver.valid(val)
-}
-
-function validateTag (data, k, val) {
-  val = ("" + val).trim()
-  if (!val || semver.validRange(val)) return false
-  data[k] = val
 }
 
 function validateStream (data, k, val) {
@@ -52,12 +38,8 @@ function validateStream (data, k, val) {
 }
 
 nopt.typeDefs.semver = { type: semver, validate: validateSemver }
-nopt.typeDefs.Octal = { type: Octal, validate: validateOctal }
 nopt.typeDefs.Stream = { type: Stream, validate: validateStream }
-
-// Don't let --tag=1.2.3 ever be a thing
-var tag = {}
-nopt.typeDefs.tag = { type: tag, validate: validateTag }
+nopt.typeDefs.Umask = { type: Umask, validate: validateUmask }
 
 nopt.invalidHandler = function (k, val, type) {
   log.warn("invalid config", k + "=" + JSON.stringify(val))
@@ -68,11 +50,8 @@ nopt.invalidHandler = function (k, val, type) {
   }
 
   switch (type) {
-    case tag:
-      log.warn("invalid config", "Tag must not be a SemVer range")
-      break
-    case Octal:
-      log.warn("invalid config", "Must be octal number, starting with 0")
+    case Umask:
+      log.warn("invalid config", "Must be umask, octal number in range 0000..0777")
       break
     case url:
       log.warn("invalid config", "Must be a full url with 'http://'")
@@ -127,7 +106,9 @@ Object.defineProperty(exports, "defaults", {get: function () {
   }
 
   defaults = {
-    "always-auth" : false
+    access : null
+    , "always-auth" : false
+
     , "bin-links" : true
     , browser : null
 
@@ -166,6 +147,7 @@ Object.defineProperty(exports, "defaults", {get: function () {
     , group : process.platform === "win32" ? 0
             : process.env.SUDO_GID || (process.getgid && process.getgid())
     , heading: "npm"
+    , "if-present": false
     , "ignore-scripts": false
     , "init-module": path.resolve(home, ".npm-init.js")
     , "init-author-name" : ""
@@ -189,9 +171,8 @@ Object.defineProperty(exports, "defaults", {get: function () {
     , prefix : globalPrefix
     , production: process.env.NODE_ENV === "production"
     , "proprietary-attribs": true
-    , proxy : process.env.HTTP_PROXY || process.env.http_proxy || null
-    , "https-proxy" : process.env.HTTPS_PROXY || process.env.https_proxy ||
-                      process.env.HTTP_PROXY || process.env.http_proxy || null
+    , proxy :  null
+    , "https-proxy" : null
     , "user-agent" : "npm/{npm-version} "
                      + "node/{node-version} "
                      + "{platform} "
@@ -215,6 +196,7 @@ Object.defineProperty(exports, "defaults", {get: function () {
     , spin: true
     , "strict-ssl": true
     , tag : "latest"
+    , "tag-version-prefix" : "v"
     , tmp : temp
     , unicode : true
     , "unsafe-perm" : process.platform === "win32"
@@ -225,7 +207,7 @@ Object.defineProperty(exports, "defaults", {get: function () {
     , usage : false
     , user : process.platform === "win32" ? 0 : "nobody"
     , userconfig : path.resolve(home, ".npmrc")
-    , umask: process.umask ? process.umask() : parseInt("022", 8)
+    , umask: process.umask ? process.umask() : umask.fromString("022")
     , version : false
     , versions : false
     , viewer: process.platform === "win32" ? "browser" : "man"
@@ -237,7 +219,8 @@ Object.defineProperty(exports, "defaults", {get: function () {
 }})
 
 exports.types =
-  { "always-auth" : Boolean
+  { access : [null, "restricted", "public"]
+  , "always-auth" : Boolean
   , "bin-links": Boolean
   , browser : [null, String]
   , ca: [null, String, Array]
@@ -268,6 +251,7 @@ exports.types =
   , "https-proxy" : [null, url]
   , "user-agent" : String
   , "heading": String
+  , "if-present": Boolean
   , "ignore-scripts": Boolean
   , "init-module": path
   , "init-author-name" : String
@@ -281,7 +265,7 @@ exports.types =
   // local-address must be listed as an IP for a local network interface
   // must be IPv4 due to node bug
   , "local-address" : getLocalAddresses()
-  , loglevel : ["silent","error","warn","http","info","verbose","silly"]
+  , loglevel : ["silent", "error", "warn", "http", "info", "verbose", "silly"]
   , logstream : Stream
   , long : Boolean
   , message: String
@@ -293,7 +277,7 @@ exports.types =
   , prefix: path
   , production: Boolean
   , "proprietary-attribs": Boolean
-  , proxy : [null, url]
+  , proxy : [null, false, url] // allow proxy to be disabled explicitly
   , "rebuild-bundle" : Boolean
   , registry : [null, url]
   , rollback : Boolean
@@ -316,24 +300,35 @@ exports.types =
   , "sign-git-tag": Boolean
   , spin: ["always", Boolean]
   , "strict-ssl": Boolean
-  , tag : tag
+  , tag : String
   , tmp : path
   , unicode : Boolean
   , "unsafe-perm" : Boolean
   , usage : Boolean
   , user : [Number, String]
   , userconfig : path
-  , umask: Octal
+  , umask: Umask
   , version : Boolean
+  , "tag-version-prefix" : String
   , versions : Boolean
   , viewer: String
   , _exit : Boolean
   }
 
-function getLocalAddresses() {
-  Object.keys(os.networkInterfaces()).map(function (nic) {
-    return os.networkInterfaces()[nic].filter(function (addr) {
-      return addr.family === "IPv4"
+function getLocalAddresses () {
+  var interfaces
+  // #8094: some environments require elevated permissions to enumerate
+  // interfaces, and synchronously throw EPERM when run without
+  // elevated privileges
+  try {
+    interfaces = os.networkInterfaces()
+  } catch (e) {
+    interfaces = {}
+  }
+
+  return Object.keys(interfaces).map(function (nic) {
+    return interfaces[nic].filter(function (addr) {
+      return addr.family === 'IPv4'
     })
     .map(function (addr) {
       return addr.address

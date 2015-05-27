@@ -1,4 +1,4 @@
-.TH "PACKAGE\.JSON" "5" "October 2014" "" ""
+.TH "PACKAGE\.JSON" "5" "May 2015" "" ""
 .SH "NAME"
 \fBpackage.json\fR \- Specifics of npm's package\.json handling
 .SH DESCRIPTION
@@ -16,22 +16,37 @@ them\.  The name and version together form an identifier that is assumed
 to be completely unique\.  Changes to the package should come along with
 changes to the version\.
 .P
-The name is what your thing is called\.  Some tips:
+The name is what your thing is called\.
+.P
+Some rules:
 .RS 0
+.IP \(bu 2
+The name must be shorter than 214 characters\. This includes the scope for
+scoped packages\.
+.IP \(bu 2
+The name can't start with a dot or an underscore\.
+.IP \(bu 2
+New packages must not have uppercase letters in the name\.
+.IP \(bu 2
+The name ends up being part of a URL, an argument on the command line, and a
+folder name\. Therefore, the name can't contain any non\-URL\-safe characters\.
+
+.RE
+.P
+Some tips:
+.RS 0
+.IP \(bu 2
+Don't use the same name as a core Node module\.
 .IP \(bu 2
 Don't put "js" or "node" in the name\.  It's assumed that it's js, since you're
 writing a package\.json file, and you can specify the engine using the "engines"
 field\.  (See below\.)
 .IP \(bu 2
-The name ends up being part of a URL, an argument on the command line, and a
-folder name\. Any name with non\-url\-safe characters will be rejected\.
-Also, it can't start with a dot or an underscore\.
-.IP \(bu 2
 The name will probably be passed as an argument to require(), so it should
 be something short, but also reasonably descriptive\.
 .IP \(bu 2
 You may want to check the npm registry to see if there's something by that name
-already, before you get too attached to it\.  http://registry\.npmjs\.org/
+already, before you get too attached to it\. https://www\.npmjs\.com/
 
 .RE
 .P
@@ -77,7 +92,7 @@ It should look like this:
 .P
 .RS 2
 .nf
-{ "url" : "http://github\.com/owner/project/issues"
+{ "url" : "https://github\.com/owner/project/issues"
 , "email" : "project@hostname\.com"
 }
 .fi
@@ -126,7 +141,7 @@ Or you can shorten that all into a single string, and npm will parse it for you:
 .P
 .RS 2
 .nf
-"Barney Rubble <b@rubble\.com> (http://barnyrubble\.tumblr\.com/)
+"Barney Rubble <b@rubble\.com> (http://barnyrubble\.tumblr\.com/)"
 .fi
 .RE
 .P
@@ -164,16 +179,16 @@ command name to local file name\. On install, npm will symlink that file into
 \fBprefix/bin\fR for global installs, or \fB\|\./node_modules/\.bin/\fR for local
 installs\.
 .P
-For example, npm has this:
+For example, myapp could have this:
 .P
 .RS 2
 .nf
-{ "bin" : { "npm" : "\./cli\.js" } }
+{ "bin" : { "myapp" : "\./cli\.js" } }
 .fi
 .RE
 .P
-So, when you install npm, it'll create a symlink from the \fBcli\.js\fR script to
-\fB/usr/local/bin/npm\fR\|\.
+So, when you install myapp, it'll create a symlink from the \fBcli\.js\fR script to
+\fB/usr/local/bin/myapp\fR\|\.
 .P
 If you have a single executable, and its name should be the name
 of the package, then you can just supply it as a string\.  For example:
@@ -251,7 +266,7 @@ will create entries for \fBman foo\fR and \fBman 2 foo\fR
 .P
 The CommonJS Packages \fIhttp://wiki\.commonjs\.org/wiki/Packages/1\.0\fR spec details a
 few ways that you can indicate the structure of your package using a \fBdirectories\fR
-object\. If you look at npm's package\.json \fIhttp://registry\.npmjs\.org/npm/latest\fR,
+object\. If you look at npm's package\.json \fIhttps://registry\.npmjs\.org/npm/latest\fR,
 you'll see that it has directories for doc, lib, and man\.
 .P
 In the future, this information may be used in other creative ways\.
@@ -279,7 +294,7 @@ Put example scripts in here\.  Someday, it might be exposed in some clever way\.
 .SH repository
 .P
 Specify the place where your code lives\. This is helpful for people who
-want to contribute\.  If the git repo is on github, then the \fBnpm docs\fR
+want to contribute\.  If the git repo is on GitHub, then the \fBnpm docs\fR
 command will be able to find you\.
 .P
 Do it like this:
@@ -288,12 +303,12 @@ Do it like this:
 .nf
 "repository" :
   { "type" : "git"
-  , "url" : "http://github\.com/npm/npm\.git"
+  , "url" : "https://github\.com/npm/npm\.git"
   }
 
 "repository" :
   { "type" : "svn"
-  , "url" : "http://v8\.googlecode\.com/svn/trunk/"
+  , "url" : "https://v8\.googlecode\.com/svn/trunk/"
   }
 .fi
 .RE
@@ -301,6 +316,21 @@ Do it like this:
 The URL should be a publicly available (perhaps read\-only) url that can be handed
 directly to a VCS program without any modification\.  It should not be a url to an
 html project page that you put in your browser\.  It's for computers\.
+.P
+For GitHub, GitHub gist, Bitbucket, or GitLab repositories you can use the same
+shortcut syntax you use for \fBnpm install\fR:
+.P
+.RS 2
+.nf
+"repository": "npm/npm"
+
+"repository": "gist:11081aaa281"
+
+"repository": "bitbucket:example/repo"
+
+"repository": "gitlab:another/repo"
+.fi
+.RE
 .SH scripts
 .P
 The "scripts" property is a dictionary containing script commands that are run
@@ -421,7 +451,9 @@ The \fBcommit\-ish\fR can be any tag, sha, or branch which can be supplied as
 an argument to \fBgit checkout\fR\|\.  The default is \fBmaster\fR\|\.
 .SH GitHub URLs
 .P
-As of version 1\.1\.65, you can refer to GitHub urls as just "foo": "user/foo\-project"\. For example:
+As of version 1\.1\.65, you can refer to GitHub urls as just "foo":
+"user/foo\-project"\.  Just as with git URLs, a \fBcommit\-ish\fR suffix can be
+included\.  For example:
 .P
 .RS 2
 .nf
@@ -429,7 +461,8 @@ As of version 1\.1\.65, you can refer to GitHub urls as just "foo": "user/foo\-p
   "name": "foo",
   "version": "0\.0\.0",
   "dependencies": {
-    "express": "visionmedia/express"
+    "express": "visionmedia/express",
+    "mocha": "visionmedia/mocha#4727d357ea"
   }
 }
 .fi
@@ -510,7 +543,7 @@ run this script as well, so that you can test it easily\.
 .P
 In some cases, you want to express the compatibility of your package with an
 host tool or library, while not necessarily doing a \fBrequire\fR of this host\.
-This is usually refered to as a \fIplugin\fR\|\. Notably, your module may be exposing
+This is usually referred to as a \fIplugin\fR\|\. Notably, your module may be exposing
 a specific interface, expected and specified by the host documentation\.
 .P
 For example:
@@ -519,7 +552,7 @@ For example:
 .nf
 {
   "name": "tea\-latte",
-  "version": "1\.3\.5"
+  "version": "1\.3\.5",
   "peerDependencies": {
     "tea": "2\.x"
   }
@@ -528,9 +561,8 @@ For example:
 .RE
 .P
 This ensures your package \fBtea\-latte\fR can be installed \fIalong\fR with the second
-major version of the host package \fBtea\fR only\. The host package is automatically
-installed if needed\. \fBnpm install tea\-latte\fR could possibly yield the following
-dependency graph:
+major version of the host package \fBtea\fR only\. \fBnpm install tea\-latte\fR could
+possibly yield the following dependency graph:
 .P
 .RS 2
 .nf
@@ -538,6 +570,13 @@ dependency graph:
 └── tea@2\.2\.0
 .fi
 .RE
+.P
+\fBNOTE: npm versions 1 and 2 will automatically install \fBpeerDependencies\fR if
+they are not explicitly depended upon higher in the dependency tree\. In the
+next major version of npm (npm@3), this will no longer be the case\. You will
+receive a warning that the peerDependency is not installed instead\.\fR The
+behavior in npms 1 & 2 was frequently confusing and could easily put you into
+dependency hell, a situation that npm is designed to avoid as much as possible\.
 .P
 Trying to install another plugin with a conflicting requirement will cause an
 error\. For this reason, make sure your plugin requirement is as broad as
@@ -615,6 +654,8 @@ Note that, unless the user has set the \fBengine\-strict\fR config flag, this
 field is advisory only\.
 .SH engineStrict
 .P
+\fBNOTE: This feature is deprecated and will be removed in npm 3\.0\.0\.\fR
+.P
 If you are sure that your module will \fIdefinitely not\fR run properly on
 versions of Node/npm other than those specified in the \fBengines\fR object,
 then you can set \fB"engineStrict": true\fR in your package\.json file\.
@@ -623,8 +664,7 @@ This will override the user's \fBengine\-strict\fR config setting\.
 Please do not do this unless you are really very very sure\.  If your
 engines object is something overly restrictive, you can quite easily and
 inadvertently lock yourself into obscurity and prevent your users from
-updating to new versions of Node\.  Consider this choice carefully\.  If
-people abuse it, it will be removed in a future version of npm\.
+updating to new versions of Node\.  Consider this choice carefully\.
 .SH os
 .P
 You can specify which operating systems your

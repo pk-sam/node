@@ -37,6 +37,7 @@ set noperfctr_arg=
 set noperfctr_msi_arg=
 set i18n_arg=
 set download_arg=
+set build_release=
 
 :next-arg
 if "%1"=="" goto args-done
@@ -69,6 +70,7 @@ if /i "%1"=="small-icu"     set i18n_arg=%1&goto arg-ok
 if /i "%1"=="full-icu"      set i18n_arg=%1&goto arg-ok
 if /i "%1"=="intl-none"     set i18n_arg=%1&goto arg-ok
 if /i "%1"=="download-all"  set download_arg="--download=all"&goto arg-ok
+if /i "%1"=="build-release" set build_release=1&goto arg-ok
 
 echo Warning: ignoring invalid command line option `%1`.
 
@@ -81,6 +83,15 @@ goto next-arg
 if defined upload goto upload
 if defined jslint goto jslint
 
+if defined build_release (
+  set nosnapshot=1
+  set config=Release
+  set msi=1
+  set licensertf=1
+  set download_arg="--download=all"
+  set i18n_arg=small-icu
+)
+
 if "%config%"=="Debug" set debug_arg=--debug
 if "%target_arch%"=="x64" set msiplatform=x64
 if defined nosnapshot set nosnapshot_arg=--without-snapshot
@@ -91,24 +102,9 @@ if "%i18n_arg%"=="full-icu" set i18n_arg=--with-intl=full-icu
 if "%i18n_arg%"=="small-icu" set i18n_arg=--with-intl=small-icu
 if "%i18n_arg%"=="intl-none" set i18n_arg=--with-intl=none
 
-:project-gen
-@rem Skip project generation if requested.
-if defined noprojgen goto msbuild
-
 if defined NIGHTLY set TAG=nightly-%NIGHTLY%
 
-@rem Generate the VS project.
-SETLOCAL
-  if defined VS100COMNTOOLS call "%VS100COMNTOOLS%\VCVarsQueryRegistry.bat"
-  python configure %download_arg% %i18n_arg% %debug_arg% %nosnapshot_arg% %noetw_arg% %noperfctr_arg% --dest-cpu=%target_arch% --tag=%TAG%
-  if errorlevel 1 goto create-msvs-files-failed
-  if not exist node.sln goto create-msvs-files-failed
-  echo Project files generated.
-ENDLOCAL
-
-:msbuild
-@rem Skip project generation if requested.
-if defined nobuild goto sign
+@rem Set environment for msbuild
 
 @rem Look for Visual Studio 2013
 if not defined VS120COMNTOOLS goto vc-set-2012
@@ -141,13 +137,29 @@ if "%VCVARS_VER%" NEQ "100" (
   SET VCVARS_VER=100
 )
 if not defined VCINSTALLDIR goto msbuild-not-found
+set GYP_MSVS_VERSION=2010
 goto msbuild-found
 
 :msbuild-not-found
-echo Build skipped. To build, this file needs to run from VS cmd prompt.
-goto run
+echo Failed to find Visual Studio installation.
+goto exit
 
 :msbuild-found
+
+:project-gen
+@rem Skip project generation if requested.
+if defined noprojgen goto msbuild
+
+@rem Generate the VS project.
+python configure %download_arg% %i18n_arg% %debug_arg% %nosnapshot_arg% %noetw_arg% %noperfctr_arg% --dest-cpu=%target_arch% --tag=%TAG%
+if errorlevel 1 goto create-msvs-files-failed
+if not exist node.sln goto create-msvs-files-failed
+echo Project files generated.
+
+:msbuild
+@rem Skip project generation if requested.
+if defined nobuild goto sign
+
 @rem Build the sln with msbuild.
 msbuild node.sln /m /t:%target% /p:Configuration=%config% /clp:NoSummary;NoItemAndPropertyList;Verbosity=minimal /nologo
 if errorlevel 1 goto exit
@@ -243,6 +255,7 @@ echo   vcbuild.bat                : builds release build
 echo   vcbuild.bat debug          : builds debug build
 echo   vcbuild.bat release msi    : builds release build and MSI installer package
 echo   vcbuild.bat test           : builds debug build and runs tests
+echo   vcbuild.bat build-release  : builds the release distribution as used by nodejs.org
 goto exit
 
 :exit

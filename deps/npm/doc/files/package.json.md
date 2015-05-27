@@ -17,18 +17,27 @@ them.  The name and version together form an identifier that is assumed
 to be completely unique.  Changes to the package should come along with
 changes to the version.
 
-The name is what your thing is called.  Some tips:
+The name is what your thing is called.
 
+Some rules:
+
+* The name must be shorter than 214 characters. This includes the scope for
+  scoped packages.
+* The name can't start with a dot or an underscore.
+* New packages must not have uppercase letters in the name.
+* The name ends up being part of a URL, an argument on the command line, and a
+  folder name. Therefore, the name can't contain any non-URL-safe characters.
+
+Some tips:
+
+* Don't use the same name as a core Node module.
 * Don't put "js" or "node" in the name.  It's assumed that it's js, since you're
   writing a package.json file, and you can specify the engine using the "engines"
   field.  (See below.)
-* The name ends up being part of a URL, an argument on the command line, and a
-  folder name. Any name with non-url-safe characters will be rejected.
-  Also, it can't start with a dot or an underscore.
 * The name will probably be passed as an argument to require(), so it should
   be something short, but also reasonably descriptive.
 * You may want to check the npm registry to see if there's something by that name
-  already, before you get too attached to it.  http://registry.npmjs.org/
+  already, before you get too attached to it. <https://www.npmjs.com/>
 
 A name can be optionally prefixed by a scope, e.g. `@myorg/mypackage`. See
 `npm-scope(7)` for more detail.
@@ -75,7 +84,7 @@ with your package.
 
 It should look like this:
 
-    { "url" : "http://github.com/owner/project/issues"
+    { "url" : "https://github.com/owner/project/issues"
     , "email" : "project@hostname.com"
     }
 
@@ -114,7 +123,7 @@ is an object with a "name" field and optionally "url" and "email", like this:
 
 Or you can shorten that all into a single string, and npm will parse it for you:
 
-    "Barney Rubble <b@rubble.com> (http://barnyrubble.tumblr.com/)
+    "Barney Rubble <b@rubble.com> (http://barnyrubble.tumblr.com/)"
 
 Both email and url are optional either way.
 
@@ -154,12 +163,12 @@ command name to local file name. On install, npm will symlink that file into
 installs.
 
 
-For example, npm has this:
+For example, myapp could have this:
 
-    { "bin" : { "npm" : "./cli.js" } }
+    { "bin" : { "myapp" : "./cli.js" } }
 
-So, when you install npm, it'll create a symlink from the `cli.js` script to
-`/usr/local/bin/npm`.
+So, when you install myapp, it'll create a symlink from the `cli.js` script to
+`/usr/local/bin/myapp`.
 
 If you have a single executable, and its name should be the name
 of the package, then you can just supply it as a string.  For example:
@@ -219,7 +228,7 @@ will create entries for `man foo` and `man 2 foo`
 
 The CommonJS [Packages](http://wiki.commonjs.org/wiki/Packages/1.0) spec details a
 few ways that you can indicate the structure of your package using a `directories`
-object. If you look at [npm's package.json](http://registry.npmjs.org/npm/latest),
+object. If you look at [npm's package.json](https://registry.npmjs.org/npm/latest),
 you'll see that it has directories for doc, lib, and man.
 
 In the future, this information may be used in other creative ways.
@@ -253,24 +262,35 @@ Put example scripts in here.  Someday, it might be exposed in some clever way.
 ## repository
 
 Specify the place where your code lives. This is helpful for people who
-want to contribute.  If the git repo is on github, then the `npm docs`
+want to contribute.  If the git repo is on GitHub, then the `npm docs`
 command will be able to find you.
 
 Do it like this:
 
     "repository" :
       { "type" : "git"
-      , "url" : "http://github.com/npm/npm.git"
+      , "url" : "https://github.com/npm/npm.git"
       }
 
     "repository" :
       { "type" : "svn"
-      , "url" : "http://v8.googlecode.com/svn/trunk/"
+      , "url" : "https://v8.googlecode.com/svn/trunk/"
       }
 
 The URL should be a publicly available (perhaps read-only) url that can be handed
 directly to a VCS program without any modification.  It should not be a url to an
 html project page that you put in your browser.  It's for computers.
+
+For GitHub, GitHub gist, Bitbucket, or GitLab repositories you can use the same
+shortcut syntax you use for `npm install`:
+
+    "repository": "npm/npm"
+
+    "repository": "gist:11081aaa281"
+
+    "repository": "bitbucket:example/repo"
+
+    "repository": "gitlab:another/repo"
 
 ## scripts
 
@@ -366,13 +386,16 @@ an argument to `git checkout`.  The default is `master`.
 
 ## GitHub URLs
 
-As of version 1.1.65, you can refer to GitHub urls as just "foo": "user/foo-project". For example:
+As of version 1.1.65, you can refer to GitHub urls as just "foo":
+"user/foo-project".  Just as with git URLs, a `commit-ish` suffix can be
+included.  For example:
 
     {
       "name": "foo",
       "version": "0.0.0",
       "dependencies": {
-        "express": "visionmedia/express"
+        "express": "visionmedia/express",
+        "mocha": "visionmedia/mocha#4727d357ea"
       }
     }
 
@@ -442,26 +465,32 @@ run this script as well, so that you can test it easily.
 
 In some cases, you want to express the compatibility of your package with an
 host tool or library, while not necessarily doing a `require` of this host.
-This is usually refered to as a *plugin*. Notably, your module may be exposing
+This is usually referred to as a *plugin*. Notably, your module may be exposing
 a specific interface, expected and specified by the host documentation.
 
 For example:
 
     {
       "name": "tea-latte",
-      "version": "1.3.5"
+      "version": "1.3.5",
       "peerDependencies": {
         "tea": "2.x"
       }
     }
 
 This ensures your package `tea-latte` can be installed *along* with the second
-major version of the host package `tea` only. The host package is automatically
-installed if needed. `npm install tea-latte` could possibly yield the following
-dependency graph:
+major version of the host package `tea` only. `npm install tea-latte` could
+possibly yield the following dependency graph:
 
     ├── tea-latte@1.3.5
     └── tea@2.2.0
+
+**NOTE: npm versions 1 and 2 will automatically install `peerDependencies` if
+they are not explicitly depended upon higher in the dependency tree. In the
+next major version of npm (npm@3), this will no longer be the case. You will
+receive a warning that the peerDependency is not installed instead.** The
+behavior in npms 1 & 2 was frequently confusing and could easily put you into
+dependency hell, a situation that npm is designed to avoid as much as possible.
 
 Trying to install another plugin with a conflicting requirement will cause an
 error. For this reason, make sure your plugin requirement is as broad as
@@ -531,6 +560,8 @@ field is advisory only.
 
 ## engineStrict
 
+**NOTE: This feature is deprecated and will be removed in npm 3.0.0.**
+
 If you are sure that your module will *definitely not* run properly on
 versions of Node/npm other than those specified in the `engines` object,
 then you can set `"engineStrict": true` in your package.json file.
@@ -539,8 +570,7 @@ This will override the user's `engine-strict` config setting.
 Please do not do this unless you are really very very sure.  If your
 engines object is something overly restrictive, you can quite easily and
 inadvertently lock yourself into obscurity and prevent your users from
-updating to new versions of Node.  Consider this choice carefully.  If
-people abuse it, it will be removed in a future version of npm.
+updating to new versions of Node.  Consider this choice carefully.
 
 ## os
 
